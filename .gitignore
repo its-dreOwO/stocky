@@ -10,3 +10,6 @@ __pycache__/
 # Model files
 *.pth
 "@ | Out-File -FilePath .gitignore -Encoding utf8
+
+#visualization output
+visualization/output/
