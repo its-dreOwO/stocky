@@ -1,4 +1,3 @@
-@"
 # Google Cloud credentials
 gcp_credentials.json
 *.json
@@ -9,4 +8,6 @@ __pycache__/
 
 # Model files
 *.pth
-"@ | Out-File -FilePath .gitignore -Encoding utf8
+
+# Visualizations
+*.png
