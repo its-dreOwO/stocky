@@ -7,7 +7,7 @@ from sklearn.preprocessing import StandardScaler
 
 class MultivariateStockDataset(Dataset):
     def __init__(self, target_ticker, market_path, sentiment_path, sec_path,
-                 seq_len=256, pred_len=1, split='train', train_ratio=0.8):
+                 seq_len=256, pred_len=1, split='train', train_ratio=0.8, feature_weights=None):
         
         self.seq_len = seq_len
         self.pred_len = pred_len
@@ -32,21 +32,17 @@ class MultivariateStockDataset(Dataset):
         merged_df = pd.merge(merged_df, ticker_sec[['Date', 'SEC_Event']], on='Date', how='left')
         merged_df['SEC_Event'] = merged_df['SEC_Event'].fillna(0)
         
-        # --- NEW: Momentum Feature Engineering ---
-        # 5-Day Rate of Change (ROC)
+        # --- Momentum Feature Engineering ---
         merged_df['ROC_5'] = merged_df['Close'].pct_change(periods=5)
-        
-        # 14-Day RSI (Relative Strength Index)
         delta = merged_df['Close'].diff()
         gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
         loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
         rs = gain / loss
         merged_df['RSI_14'] = 100 - (100 / (1 + rs))
         
-        # Fill NaN values created by windowing
         merged_df = merged_df.fillna(0).sort_values('Date').reset_index(drop=True)
         
-        # 4. Feature Selection (Now 13 Features)
+        # 4. Feature Selection (13 Features)
         self.feature_cols = [
             'Open', 'High', 'Low', 'Close', 'Volume',          
             'Fed_Rate', 'CPI', 'Treasury_10Y',                 
@@ -71,6 +67,19 @@ class MultivariateStockDataset(Dataset):
         self.scaler.fit(data_matrix[:train_size]) 
         self.data_scaled = self.scaler.transform(self.data)
         
+        # --- MULTIVARIATE FEATURE WEIGHTING ---
+        # feature_weights should be a dict: {'ROC_5': 1.5, 'Sentiment_Tone': 1.2, ...}
+        if feature_weights:
+            for col_name, weight in feature_weights.items():
+                # Map specific news/sentiment columns if they contain ticker names
+                mapped_col = col_name.replace('{TICKER}', target_ticker)
+                if mapped_col in self.feature_cols:
+                    idx = self.feature_cols.index(mapped_col)
+                    self.data_scaled[:, idx] *= weight
+                elif col_name in self.feature_cols:
+                    idx = self.feature_cols.index(col_name)
+                    self.data_scaled[:, idx] *= weight
+
         self.x_tensors, self.y_tensors = self._generate_sequences()
         
     def _generate_sequences(self):

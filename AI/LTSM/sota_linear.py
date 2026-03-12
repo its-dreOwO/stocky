@@ -3,17 +3,15 @@ import torch.nn as nn
 
 class SeriesDecomposition(nn.Module):
     """
-    Decouples the input sequence into Trend and Seasonal (Remainder) components.
+    Decouples the input sequence into Trend and Seasonal components.
     """
     def __init__(self, kernel_size):
         super(SeriesDecomposition, self).__init__()
         self.moving_avg = nn.AvgPool1d(kernel_size=kernel_size, stride=1, padding=0)
 
     def forward(self, x):
-        # x shape: [Batch, Seq_Len, Features] -> [Batch, Features, Seq_Len] for Pool1d
+        # x: [Batch, Seq_Len, Features]
         x_transpose = x.permute(0, 2, 1)
-        
-        # Padding to maintain sequence length
         front = x_transpose[:, :, 0:1].repeat(1, 1, (self.moving_avg.kernel_size[0] - 1) // 2)
         end = x_transpose[:, :, -1:].repeat(1, 1, self.moving_avg.kernel_size[0] // 2)
         x_padded = torch.cat([front, x_transpose, end], dim=-1)
@@ -27,67 +25,69 @@ class DLinear(nn.Module):
         super(DLinear, self).__init__()
         self.deconstruction = SeriesDecomposition(kernel_size=25)
         
-        # Individual linear layers for each component
-        self.linear_seasonal = nn.Linear(seq_len, pred_len)
-        self.linear_trend = nn.Linear(seq_len, pred_len)
+        # Joint interaction layers
+        self.linear_seasonal = nn.Linear(seq_len * input_dim, pred_len)
+        self.linear_trend = nn.Linear(seq_len * input_dim, pred_len)
+        self.dropout = nn.Dropout(0.1)
 
     def forward(self, x):
-        # x: [Batch, Seq_Len, Input_Dim]
+        batch_size = x.size(0)
         seasonal, trend = self.deconstruction(x)
         
-        # Project each feature independently
-        seasonal_out = self.linear_seasonal(seasonal.permute(0, 2, 1)).permute(0, 2, 1)
-        trend_out = self.linear_trend(trend.permute(0, 2, 1)).permute(0, 2, 1)
+        seasonal = seasonal.reshape(batch_size, -1)
+        trend = trend.reshape(batch_size, -1)
         
-        # Return only the Close Price prediction (index 3 conventionally)
-        # Note: If you want all features predicted, remove the indexing
-        return (seasonal_out + trend_out)[:, :, 3] 
+        return self.dropout(self.linear_seasonal(seasonal)) + self.dropout(self.linear_trend(trend))
 
-# class NLinear(nn.Module):
-#     def __init__(self, seq_len, pred_len, input_dim):
-#         super(NLinear, self).__init__()
-#         self.linear = nn.Linear(seq_len, pred_len)
-
-#     def forward(self, x):
-#         # Normalization: Subtract the last observed value
-#         seq_last = x[:, -1:, :].detach()
-#         x = x - seq_last
-        
-#         # Linear projection
-#         out = self.linear(x.permute(0, 2, 1)).permute(0, 2, 1)
-        
-#         # Denormalization: Add the last observed value back
-#         out = out + seq_last[:, :, :]
-#         return out[:, :, 3] # Return predicted Close Price
 class NLinear(nn.Module):
+    """
+    Optimized NLinear for Multivariate Reversals.
+    Uses 'Joint Temporal Projection' to catch when momentum is lying.
+    """
     def __init__(self, seq_len, pred_len, input_dim):
         super(NLinear, self).__init__()
         self.seq_len = seq_len
         self.pred_len = pred_len
+        self.input_dim = input_dim
         
-        # Channel Independence: Each of the 13 features gets its own 'brain'
-        self.linears = nn.ModuleList([
-            nn.Linear(seq_len, pred_len) for _ in range(input_dim)
-        ])
+        # Joint Temporal Layer: Allows model to see all features simultaneously 
+        # over time to detect trend exhaustion.
+        self.temporal_joint = nn.Sequential(
+            nn.Linear(seq_len * input_dim, 512),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(512, pred_len * 16) # Expand to a hidden space for mixing
+        )
+        
+        # Reversal Mixer: Specifically designed to decide if the 'trend'
+        # should continue or reverse based on feature interactions.
+        self.reversal_mixer = nn.Sequential(
+            nn.Linear(16, 32),
+            nn.ReLU(),
+            nn.Linear(32, 1)
+        )
 
     def forward(self, x):
-        # x: [Batch, Seq_Len, 13]
+        # x: [Batch, Seq_Len, Input_Dim]
+        batch_size = x.size(0)
         
-        # 1. Normalization (NLinear trick)
+        # 1. Normalization (Handle non-stationarity)
         seq_last = x[:, -1:, :].detach()
         x = x - seq_last
         
-        # 2. Individual Feature Processing
-        # Permute to [Batch, 13, Seq_Len]
-        x = x.permute(0, 2, 1)
+        # 2. Joint Feature-Temporal Learning
+        # Flatten to [Batch, Seq_Len * Input_Dim]
+        x_flat = x.reshape(batch_size, -1)
+        combined_features = self.temporal_joint(x_flat) # [Batch, Pred_Len * 16]
         
-        output = torch.zeros([x.size(0), x.size(1), self.pred_len], dtype=x.dtype).to(x.device)
-        for i, layer in enumerate(self.linears):
-            output[:, i, :] = layer(x[:, i, :])
+        # 3. Reshape for per-day reversal logic
+        combined_features = combined_features.reshape(batch_size, self.pred_len, 16)
         
-        # 3. Denormalize
-        output = output.permute(0, 2, 1) # [Batch, Pred_Len, 13]
-        output = output + seq_last
+        # 4. Predict the delta (offset) from the last known price
+        # This delta can now be negative even if momentum was positive
+        delta_pred = self.reversal_mixer(combined_features).squeeze(-1) # [Batch, Pred_Len]
         
-        # Return only the 'Close' price (index 3)
-        return output[:, :, 3]
+        # 5. Denormalization Anchor (Close price is index 3)
+        target_last = seq_last[:, :, 3] # [Batch, 1]
+        
+        return delta_pred + target_last
