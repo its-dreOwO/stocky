@@ -116,7 +116,7 @@ def execute_rolling_evaluation(target_equity, forecast_start_date, total_steps, 
     plt.plot(actual_dates_for_plot, predicted_prices_for_plot, 's--', label=f'Forecast ({MODEL_TYPE})', color='#e74c3c', linewidth=2)
 
     plt.axvline(x=merged_df['Date'].iloc[start_idx], color='gray', linestyle=':', label='Forecast Start')
-    plt.title(f"Forecast Comparison ({mode_str}): {target_equity} ({total_steps_executed} Days)", fontsize=14)
+    plt.title(f"Forecast Comparison ({mode_str}): {target_equity} ({PRED_LEN} Days)", fontsize=14)
     plt.xlabel("Date")
     plt.ylabel("Close Price (USD)")
     plt.legend()
