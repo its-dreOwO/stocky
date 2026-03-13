@@ -13,8 +13,6 @@ __pycache__/
 
 #visualization output
 visualization/output/
-=======
 
-# Visualizations
-*.png
->>>>>>> 57740da2e3b28ec5d5f92bf6c02953e91db38017
+#docs
+docs/lessons
