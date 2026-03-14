@@ -12,13 +12,11 @@ class MultivariateStockDataset(Dataset):
         self.seq_len = seq_len
         self.pred_len = pred_len
         
-        # 1. Load Core Datasets
         market_df = pd.read_csv(market_path)
         sentiment_df = pd.read_csv(sentiment_path)
         market_df['Date'] = pd.to_datetime(market_df['Date'])
         sentiment_df['Date'] = pd.to_datetime(sentiment_df['Date'])
         
-        # 2. Load SEC Event Data
         if os.path.exists(sec_path):
             sec_df = pd.read_csv(sec_path)
             sec_df['Date'] = pd.to_datetime(sec_df['Date'])
@@ -26,13 +24,11 @@ class MultivariateStockDataset(Dataset):
         else:
             ticker_sec = pd.DataFrame(columns=['Date', 'SEC_Event'])
 
-        # 3. Synchronized Merging
         ticker_df = market_df[market_df['Ticker'] == target_ticker].copy()
         merged_df = pd.merge(ticker_df, sentiment_df, on='Date', how='inner')
         merged_df = pd.merge(merged_df, ticker_sec[['Date', 'SEC_Event']], on='Date', how='left')
         merged_df['SEC_Event'] = merged_df['SEC_Event'].fillna(0)
         
-        # --- Momentum Feature Engineering ---
         merged_df['ROC_5'] = merged_df['Close'].pct_change(periods=5)
         delta = merged_df['Close'].diff()
         gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
@@ -42,7 +38,6 @@ class MultivariateStockDataset(Dataset):
         
         merged_df = merged_df.fillna(0).sort_values('Date').reset_index(drop=True)
         
-        # 4. Feature Selection (13 Features)
         self.feature_cols = [
             'Open', 'High', 'Low', 'Close', 'Volume',          
             'Fed_Rate', 'CPI', 'Treasury_10Y',                 
@@ -55,23 +50,18 @@ class MultivariateStockDataset(Dataset):
         data_matrix = merged_df[self.feature_cols].values
         self.target_idx = self.feature_cols.index('Close')
         
-        # 5. Temporal Splitting
         train_size = int(len(data_matrix) * train_ratio)
         if split == 'train':
             self.data = data_matrix[:train_size]
         else:
             self.data = data_matrix[train_size - self.seq_len:]
             
-        # 6. Scaling
         self.scaler = StandardScaler()
         self.scaler.fit(data_matrix[:train_size]) 
         self.data_scaled = self.scaler.transform(self.data)
         
-        # --- MULTIVARIATE FEATURE WEIGHTING ---
-        # feature_weights should be a dict: {'ROC_5': 1.5, 'Sentiment_Tone': 1.2, ...}
         if feature_weights:
             for col_name, weight in feature_weights.items():
-                # Map specific news/sentiment columns if they contain ticker names
                 mapped_col = col_name.replace('{TICKER}', target_ticker)
                 if mapped_col in self.feature_cols:
                     idx = self.feature_cols.index(mapped_col)

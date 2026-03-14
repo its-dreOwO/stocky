@@ -1,4 +1,3 @@
-
 import os
 import json
 import torch
@@ -9,13 +8,9 @@ from main import train_model, TARGET_EQUITY, MARKET_DATA_PATH, SENTIMENT_DATA_PA
 from dataset_builder import MultivariateStockDataset
 
 def evaluate_config(model, config):
-    """
-    Evaluates the model on a one-step-ahead basis using the specified configuration.
-    """
     s_len = config['seq_len']
     f_weights = config['feature_weights']
     
-    # Initialize dataset for evaluation
     dataset = MultivariateStockDataset(TARGET_EQUITY, MARKET_DATA_PATH, SENTIMENT_DATA_PATH, SEC_DATA_PATH,
                                        seq_len=s_len, pred_len=PRED_LEN, split='test', train_ratio=0.8, feature_weights=f_weights)
     
@@ -29,11 +24,9 @@ def evaluate_config(model, config):
             x = x.unsqueeze(0).to(DEVICE)
             pred = model(x).cpu().numpy().flatten()
             
-            # Record first day of prediction vs first day of ground truth
             all_preds.append(pred[0])
             all_trues.append(y[0].item())
             
-    # Inverse scaling
     preds_np = np.array(all_preds)
     trues_np = np.array(all_trues)
     num_features = dataset.scaler.n_features_in_
@@ -52,20 +45,14 @@ def evaluate_config(model, config):
     return mae, rmse
 
 def run_tuning_suite():
-    """
-    Runs a systematic search over hyperparameters and feature weights.
-    """
-    # Define hyperparameter grid
     seq_lens = [128, 192]
     lrs = [1e-3, 5e-4]
     
-    # Define feature weighting groups to keep tuning manageable
-    # You can customize these multipliers
     weight_scenarios = [
-        {'ROC_5': 1.0, 'RSI_14': 1.0, 'Sentiment': 1.0, 'SEC': 1.0, 'Macro': 1.0}, # Baseline
-        {'ROC_5': 1.5, 'RSI_14': 1.5, 'Sentiment': 1.0, 'SEC': 1.0, 'Macro': 1.0}, # Momentum Focus
-        {'ROC_5': 1.2, 'RSI_14': 1.2, 'Sentiment': 1.5, 'SEC': 1.5, 'Macro': 1.0}, # Sentiment/Event Focus
-        {'ROC_5': 1.5, 'RSI_14': 1.5, 'Sentiment': 1.2, 'SEC': 1.2, 'Macro': 1.2}, # All boosted
+        {'ROC_5': 1.0, 'RSI_14': 1.0, 'Sentiment': 1.0, 'SEC': 1.0, 'Macro': 1.0}, 
+        {'ROC_5': 1.5, 'RSI_14': 1.5, 'Sentiment': 1.0, 'SEC': 1.0, 'Macro': 1.0}, 
+        {'ROC_5': 1.2, 'RSI_14': 1.2, 'Sentiment': 1.5, 'SEC': 1.5, 'Macro': 1.0}, 
+        {'ROC_5': 1.5, 'RSI_14': 1.5, 'Sentiment': 1.2, 'SEC': 1.2, 'Macro': 1.2}, 
     ]
     
     results = []
@@ -82,8 +69,6 @@ def run_tuning_suite():
             for scenario in weight_scenarios:
                 count += 1
                 
-                # Construct the full 13-parameter feature_weights dictionary
-                # This maps the scenario groups to the actual 13 columns
                 f_weights = {
                     'Open': 1.0, 'High': 1.0, 'Low': 1.0, 'Close': 1.0, 'Volume': 1.0,
                     'Fed_Rate': scenario['Macro'], 
@@ -100,7 +85,7 @@ def run_tuning_suite():
                     'seq_len': s_len,
                     'lr': lr,
                     'feature_weights': f_weights,
-                    'epochs': 40 # Fast tuning
+                    'epochs': 40 
                 }
                 
                 print(f"[{count}/{total_combos}] Testing SEQ={s_len}, LR={lr}, Scenario={list(scenario.values())}...")

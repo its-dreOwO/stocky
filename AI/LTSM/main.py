@@ -1,4 +1,3 @@
-
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -8,21 +7,17 @@ import warnings
 import time
 import os
 
-# Internal project imports
 from dataset_builder import MultivariateStockDataset
 from sota_linear import DLinear, NLinear
 
 warnings.filterwarnings('ignore')
 
-# ==========================================
-# CONFIGURATION & HYPERPARAMETERS (SYNC THESE WITH TUNER RESULTS)
-# ==========================================
 MARKET_DATA_PATH = "../../data/main_data/tech_macro_aligned.csv"
 SENTIMENT_DATA_PATH = "../../data/data_scrapping/temp/gdelt_sentiment_bq_aligned.csv"
 SEC_DATA_PATH = "../../data/main_data/sec_events.csv"
 TARGET_EQUITY = 'AAPL'
 
-MODEL_TYPE = 'NLINEAR' 
+MODEL_TYPE = 'LSTM' 
 SEQ_LEN = 192           
 PRED_LEN = 20           
 INPUT_DIM = 13          
@@ -33,19 +28,12 @@ LEARNING_RATE = 1e-3
 EPOCHS = 150            
 PATIENCE = 30          
 
-# Optimized weights from tuner (UPDATE THESE AFTER RUNNING TUNER)
-# FEATURE_WEIGHTS = { NLINEAR OPTIMZED
-#     'ROC_5': 0.65, 
-#     'RSI_14': 0.65,
-#     '{TICKER}_Sentiment_Tone': 0.65,
-#     'SEC_Event': 1.0
-# }
-FEATURE_WEIGHTS = {
-        'ROC_5': 0.65, 
-        'RSI_14': 0.65,
-        '{TICKER}_Sentiment_Tone': 0.65,
-        'SEC_Event': 1.0
-    }
+FEATURE_WEIGHTS = { 
+    'ROC_5': 0.65, 
+    'RSI_14': 0.65,
+    '{TICKER}_Sentiment_Tone': 0.65,
+    'SEC_Event': 1.0
+}
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -99,9 +87,6 @@ class ModelFactory(nn.Module):
             return self.core(x)
 
 def train_model(config, verbose=True):
-    """
-    Function used by the tuner or standard run to train with a specific config.
-    """
     m_type = config.get('model_type', MODEL_TYPE)
     s_len = config.get('seq_len', SEQ_LEN)
     p_len = config.get('pred_len', PRED_LEN)
@@ -109,10 +94,8 @@ def train_model(config, verbose=True):
     bs = config.get('batch_size', BATCH_SIZE)
     epochs = config.get('epochs', EPOCHS)
     
-    # Use config weights (from tuner) or global optimized weights (standard run)
     f_weights = config.get('feature_weights', FEATURE_WEIGHTS)
     
-    # Data Loading
     train_set = MultivariateStockDataset(TARGET_EQUITY, MARKET_DATA_PATH, SENTIMENT_DATA_PATH, SEC_DATA_PATH, 
                                        seq_len=s_len, pred_len=p_len, split='train', feature_weights=f_weights)
     test_set = MultivariateStockDataset(TARGET_EQUITY, MARKET_DATA_PATH, SENTIMENT_DATA_PATH, SEC_DATA_PATH, 
@@ -126,7 +109,6 @@ def train_model(config, verbose=True):
     criterion = nn.MSELoss()
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=10)
     
-    # Checkpoint configuration
     weight_path = config.get('weight_path', f"multivariate_{m_type.lower()}_{TARGET_EQUITY}.pth")
     stopper = EarlyStopping(patience=PATIENCE, path=weight_path)
     scaler = torch.cuda.amp.GradScaler()

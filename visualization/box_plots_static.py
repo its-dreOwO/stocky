@@ -6,32 +6,20 @@ import warnings
 
 warnings.filterwarnings('ignore')
 
-# Use non-interactive backend for saving files only
 plt.switch_backend('Agg')
 
-# ==========================================
-# CONFIGURATION
-# ==========================================
-# Get the directory where this script is located
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
 
 DATA_PATH = os.path.join(PROJECT_ROOT, "data", "main_data", "tech_macro_aligned.csv")
 OUTPUT_DIR = os.path.join(SCRIPT_DIR, "output")
 
-# ==========================================
-# 1. BOX PLOT
-# ==========================================
 def plot_box(df: pd.DataFrame, save: bool = False):
-    """
-    Box Plot to show price distribution by ticker and detect outliers.
-    """
     fig, ax = plt.subplots(figsize=(10, 6))
     
     data = [df[df['Ticker'] == t]['Close'].values for t in df['Ticker'].unique()]
     ax.boxplot(data, tick_labels=df['Ticker'].unique(), patch_artist=True)
     
-    # Color each box
     colors = plt.cm.Set3(np.linspace(0, 1, len(data)))
     for patch, color in zip(ax.artists, colors):
         patch.set_facecolor(color)
@@ -50,18 +38,11 @@ def plot_box(df: pd.DataFrame, save: bool = False):
 
     plt.close()
 
-# ==========================================
-# 2. HISTOGRAM
-# ==========================================
 def plot_histogram(df: pd.DataFrame, column: str = 'Close', bins: int = 30, save: bool = False):
-    """
-    Histogram to show distribution of a data column.
-    """
     fig, ax = plt.subplots(figsize=(10, 6))
     
     ax.hist(df[column], bins=bins, edgecolor='black', alpha=0.7, color='skyblue')
     
-    # Add mean and median lines
     mean = df[column].mean()
     median = df[column].median()
     ax.axvline(mean, color='red', linestyle='--', linewidth=2, label=f'Mean: {mean:.2f}')
@@ -82,16 +63,9 @@ def plot_histogram(df: pd.DataFrame, column: str = 'Close', bins: int = 30, save
 
     plt.close()
 
-# ==========================================
-# 3. COMBINED PLOT (BOX + HISTOGRAM)
-# ==========================================
 def plot_combined(df: pd.DataFrame, column: str = 'Close', bins: int = 30, save: bool = False):
-    """
-    Combined Box Plot and Histogram on the same figure.
-    """
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
     
-    # Box Plot (left)
     data = [df[df['Ticker'] == t][column].values for t in df['Ticker'].unique()]
     ax1.boxplot(data, tick_labels=df['Ticker'].unique(), patch_artist=True)
     colors = plt.cm.Set3(np.linspace(0, 1, len(data)))
@@ -101,7 +75,6 @@ def plot_combined(df: pd.DataFrame, column: str = 'Close', bins: int = 30, save:
     ax1.set_ylabel(column, fontsize=10)
     ax1.grid(True, alpha=0.3, linestyle='--')
     
-    # Histogram (right)
     ax2.hist(df[column], bins=bins, edgecolor='black', alpha=0.7, color='skyblue')
     mean = df[column].mean()
     median = df[column].median()
@@ -123,9 +96,6 @@ def plot_combined(df: pd.DataFrame, column: str = 'Close', bins: int = 30, save:
 
     plt.close()
 
-# ==========================================
-# MAIN EXECUTION
-# ==========================================
 if __name__ == "__main__":
     print(f"Loading data from: {DATA_PATH}")
     

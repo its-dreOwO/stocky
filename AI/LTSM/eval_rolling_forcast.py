@@ -7,23 +7,16 @@ import os
 import argparse 
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 
-# Internal project imports - NOW INCLUDING FEATURE_WEIGHTS
 from main import ModelFactory, INPUT_DIM, HIDDEN_DIM, NUM_LAYERS, PRED_LEN, SEQ_LEN, MODEL_TYPE, DEVICE, FEATURE_WEIGHTS
 from dataset_builder import MultivariateStockDataset
 
 warnings.filterwarnings('ignore')
 
-# ==========================================
-# EVALUATION CONFIGURATION
-# ==========================================
 MARKET_DATA_PATH = "../../data/main_data/tech_macro_aligned.csv"
 SENTIMENT_DATA_PATH = "../../data/data_scrapping/temp/gdelt_sentiment_bq_aligned.csv"
 SEC_DATA_PATH = "../../data/main_data/sec_events.csv"
 
 def execute_rolling_evaluation(target_equity, forecast_start_date, total_steps, use_actuals=True, model_weights=None):
-    """
-    Executes a forecast evaluation using synchronized FEATURE_WEIGHTS.
-    """
     mode_str = "ONE-STEP (using Actuals)" if use_actuals else "RECURSIVE ROLLING"
     print(f"\n--- Starting {total_steps}-Day {mode_str} Evaluation for {MODEL_TYPE} ---")
     print(f"--- Ticker: {target_equity} | Start Date: {forecast_start_date} ---")
@@ -34,19 +27,16 @@ def execute_rolling_evaluation(target_equity, forecast_start_date, total_steps, 
     if not os.path.exists(model_weights):
         raise FileNotFoundError(f"Model weights not found at {model_weights}")
 
-    # 1. Dataset Initialization (CRITICAL: Pass FEATURE_WEIGHTS here)
     dataset = MultivariateStockDataset(
         target_equity, MARKET_DATA_PATH, SENTIMENT_DATA_PATH, SEC_DATA_PATH,
         seq_len=SEQ_LEN, pred_len=PRED_LEN, split='train', train_ratio=1.0,
         feature_weights=FEATURE_WEIGHTS
     )
     
-    # 2. Model Reconstruction
     model = ModelFactory(MODEL_TYPE, SEQ_LEN, PRED_LEN, INPUT_DIM, HIDDEN_DIM, NUM_LAYERS).to(DEVICE)
     model.load_state_dict(torch.load(model_weights, map_location=DEVICE))
     model.eval()
 
-    # 3. Data Loading & Temporal Alignment
     market_df = pd.read_csv(MARKET_DATA_PATH)
     market_df['Date'] = pd.to_datetime(market_df['Date'])
     ticker_df = market_df[market_df['Ticker'] == target_equity].sort_values('Date').reset_index(drop=True)
@@ -68,7 +58,6 @@ def execute_rolling_evaluation(target_equity, forecast_start_date, total_steps, 
     if start_idx < SEQ_LEN:
         raise ValueError(f"Not enough historical data before {forecast_start_date} for SEQ_LEN={SEQ_LEN}")
 
-    # 4. INFERENCE LOOP
     current_window = dataset.data_scaled[start_idx - SEQ_LEN : start_idx].copy()
     preds_scaled = []
     
@@ -90,7 +79,6 @@ def execute_rolling_evaluation(target_equity, forecast_start_date, total_steps, 
             
         current_window = np.vstack([current_window[1:], next_row])
 
-    # 5. Inverse Scaling & Metrics
     total_steps_executed = len(preds_scaled)
     num_features = dataset.scaler.n_features_in_
     dummy = np.zeros((total_steps_executed, num_features))
@@ -134,4 +122,4 @@ if __name__ == "__main__":
     parser.add_argument('--weights', type=str, default=None)
     args = parser.parse_args()
     
-    execute_rolling_evaluation(args.ticker, args.date, args.days, args.use_actuals, args.weights)
+execute_rolling_evaluation(args.ticker, args.date, args.days, args.use_actuals, args.weights)

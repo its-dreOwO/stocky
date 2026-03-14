@@ -4,16 +4,8 @@ from google.cloud import bigquery
 import warnings
 
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "gcp_credentials.json"
-# Suppress non-critical warnings during runtime
 warnings.filterwarnings('ignore')
 
-# ==========================================
-# CONFIGURATION PARAMETERS
-# ==========================================
-# Google Cloud service account authentication matrix
-
-
-# Lexical mapping for BigQuery SQL constraints. 
 COMPANY_KEYWORDS = {
     'AAPL': 'Apple Inc',
     'MSFT': 'Microsoft',
@@ -25,20 +17,12 @@ COMPANY_KEYWORDS = {
 START_DATE = '2020-01-01'
 END_DATE = '2025-12-31'
 
-# Updated I/O routing
 OUTPUT_DIR = 'temp'
 OUTPUT_FILE = 'gdelt_sentiment_bq_aligned.csv'
 
 def query_gdelt_bigquery(client, ticker, keyword, start, end):
-    
-    """
-    Executes standard SQL queries against the GDELT 2.0 Global Knowledge Graph (GKG).
-    Implements SUBSTR and PARSE_DATE to handle GDELT's non-standard YYYYMMDDHHMMSS datetime encoding.
-    """
     print(f"[{ticker}] Initiating BigQuery execution for entity: {keyword}")
     
-    # SQL Query Formulation
-    # SUBSTR extracts YYYYMMDD. PARSE_DATE converts it to a standard SQL Date.
     query = f"""
         SELECT 
             CAST(PARSE_DATE('%Y%m%d', SUBSTR(CAST(DATE AS STRING), 1, 8)) AS STRING) as Date,
@@ -56,7 +40,6 @@ def query_gdelt_bigquery(client, ticker, keyword, start, end):
     """
     
     try:
-        # Execute query and convert directly to DataFrame
         query_job = client.query(query)
         df = query_job.to_dataframe()
         
@@ -71,10 +54,8 @@ def query_gdelt_bigquery(client, ticker, keyword, start, end):
     except Exception as e:
         print(f"  -> [Error] BigQuery execution failed: {repr(e)}")
         return pd.DataFrame()
+
 def build_bigquery_dataset():
-    """
-    Constructs the multivariate sentiment dataset via Google Cloud infrastructure.
-    """
     print("Establishing connection to Google Cloud BigQuery...")
     client = bigquery.Client()
     master_df = pd.DataFrame()
@@ -104,7 +85,6 @@ if __name__ == "__main__":
         print("\nBigQuery Extraction Complete. Data Sample:")
         print(dataset.head())
         
-        # Ensure the nested directory structure exists
         os.makedirs(OUTPUT_DIR, exist_ok=True)
         
         output_path = os.path.join(OUTPUT_DIR, OUTPUT_FILE)
