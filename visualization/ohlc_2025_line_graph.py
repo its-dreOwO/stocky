@@ -11,21 +11,21 @@ else:
 
     df['Date'] = pd.to_datetime(df['Date'])
 
-    df_2025 = df[df['Date'].dt.year == 2025].copy()
+    df_jan_2025 = df[(df['Date'].dt.year == 2025) & (df['Date'].dt.month == 1)].copy()
 
-    if df_2025.empty:
-        print("No data found for the year 2025.")
+    if df_jan_2025.empty:
+        print("No data found for January 2025.")
     else:
-        tickers = df_2025['Ticker'].unique()
+        tickers = df_jan_2025['Ticker'].unique()
         
         output_dir = os.path.join('visualization', 'output')
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
         for selected_ticker in tickers:
-            print(f"Generating OHLC line graph for: {selected_ticker} (Year: 2025)")
+            print(f"Generating OHLC line graph for: {selected_ticker} (Jan 2025)")
 
-            ticker_data = df_2025[df_2025['Ticker'] == selected_ticker].sort_values('Date')
+            ticker_data = df_jan_2025[df_jan_2025['Ticker'] == selected_ticker].sort_values('Date')
 
             plt.figure(figsize=(12, 6))
             plt.plot(ticker_data['Date'], ticker_data['Open'], label='Open', linestyle='-', alpha=0.7)
@@ -33,14 +33,14 @@ else:
             plt.plot(ticker_data['Date'], ticker_data['Low'], label='Low', linestyle='--', alpha=0.7)
             plt.plot(ticker_data['Date'], ticker_data['Close'], label='Close', linestyle='-', alpha=0.7)
 
-            plt.title(f'{selected_ticker} OHLC Prices - 2025')
+            plt.title(f'{selected_ticker} OHLC Prices - January 2025')
             plt.xlabel('Date')
             plt.ylabel('Price')
             plt.legend()
             plt.grid(True, which='both', linestyle='--', linewidth=0.5)
             plt.tight_layout()
 
-            output_file = os.path.join(output_dir, f'{selected_ticker}_OHLC_2025.png')
+            output_file = os.path.join(output_dir, f'{selected_ticker}_OHLC_Jan_2025.png')
             plt.savefig(output_file)
             print(f"Graph saved as: {output_file}")
             plt.close() 

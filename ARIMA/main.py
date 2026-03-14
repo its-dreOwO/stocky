@@ -80,7 +80,10 @@ errors = np.abs(np.array(actual_prices) - np.array(predictions))
 top_k_percent = 0.2
 k = max(1, int(len(errors) * top_k_percent)) 
 shock_mae = (np.mean(sorted(errors, reverse=True)[:k]) / avg_price) * 100
-print(f'2. MAE: {shock_mae:.2f}%')
+print(f'2. MAE (Top 20%): {shock_mae:.2f}%')
+
+std_error = (np.std(errors) / avg_price) * 100
+print(f'3. Standard Deviation (Errors): {std_error:.2f}%')
 import matplotlib.pyplot as plt
 
 upper_bounds = []

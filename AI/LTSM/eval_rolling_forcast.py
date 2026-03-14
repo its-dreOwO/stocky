@@ -94,10 +94,12 @@ def execute_rolling_evaluation(target_equity, forecast_start_date, total_steps, 
 
     mae = mean_absolute_error(true_prices_for_plot[1:], predicted_prices)
     rmse = np.sqrt(mean_squared_error(true_prices_for_plot[1:], predicted_prices))
+    std_err = np.std(np.abs(true_prices_for_plot[1:] - predicted_prices))
     
     print(f"\nAnalysis Results ({total_steps_executed} Days):")
     print(f"  > MAE:  ${mae:.2f}")
     print(f"  > RMSE: ${rmse:.2f}")
+    print(f"  > STD:  ${std_err:.2f}")
     
     plt.figure(figsize=(14, 7))
     plt.plot(actual_dates_for_plot, true_prices_for_plot, 'o-', label='Ground Truth', color="#060c8f", linewidth=2)

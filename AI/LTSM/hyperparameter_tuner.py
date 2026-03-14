@@ -41,8 +41,9 @@ def evaluate_config(model, config):
     
     mae = mean_absolute_error(inv_trues, inv_preds)
     rmse = np.sqrt(mean_squared_error(inv_trues, inv_preds))
+    std_err = np.std(np.abs(inv_trues - inv_preds))
     
-    return mae, rmse
+    return mae, rmse, std_err
 
 def run_tuning_suite():
     seq_lens = [128, 192]
@@ -92,15 +93,16 @@ def run_tuning_suite():
                 
                 try:
                     model, _ = train_model(config, verbose=False)
-                    mae, rmse = evaluate_config(model, config)
+                    mae, rmse, std_err = evaluate_config(model, config)
                     
                     result = {
                         'config': config,
                         'mae': mae,
-                        'rmse': rmse
+                        'rmse': rmse,
+                        'std': std_err
                     }
                     results.append(result)
-                    print(f"   > Result: MAE=${mae:.2f}, RMSE=${rmse:.2f}")
+                    print(f"   > Result: MAE=${mae:.2f}, RMSE=${rmse:.2f}, STD=${std_err:.2f}")
                     
                     if mae < best_mae:
                         best_mae = mae
