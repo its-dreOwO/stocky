@@ -108,16 +108,16 @@ for i in range(len(test_prices)):
 print("\n--- ĐÁNH GIÁ HIỆU SUẤT ---")
 avg_price = np.mean(actual_prices)
 rmse = (np.sqrt(mean_squared_error(actual_prices, predictions)) / avg_price) * 100
-print(f'1. RMSE: {rmse:.2f}%')
+print(f'> RMSE: {rmse:.2f}%')
 
 errors = np.abs(np.array(actual_prices) - np.array(predictions))
 top_k_percent = 0.2
 k = max(1, int(len(errors) * top_k_percent)) 
 shock_mae = (np.mean(sorted(errors, reverse=True)[:k]) / avg_price) * 100
-print(f'2. MAE (Top 20%): {shock_mae:.2f}%')
+print(f'> MAE: {shock_mae:.2f}%')
 
 std_error = (np.std(errors) / avg_price) * 100
-print(f'3. Standard Deviation (Errors): {std_error:.2f}%')
+print(f'> STD: {std_error:.2f}%')
 
 upper_bounds = []
 lower_bounds = []

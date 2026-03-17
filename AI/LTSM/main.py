@@ -17,7 +17,7 @@ SENTIMENT_DATA_PATH = "../../data/data_scrapping/temp/gdelt_sentiment_bq_aligned
 SEC_DATA_PATH = "../../data/main_data/sec_events.csv"
 TARGET_EQUITY = 'AAPL'
 
-MODEL_TYPE = 'LSTM' 
+MODEL_TYPE = 'DLINEAR' 
 SEQ_LEN = 192           
 PRED_LEN = 20           
 INPUT_DIM = 13          
