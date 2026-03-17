@@ -1,28 +1,38 @@
-import yfinance as yf
 import pandas as pd
 import numpy as np
 import warnings
+import os
 from statsmodels.tsa.arima.model import ARIMA
 from arch import arch_model
 from sklearn.metrics import mean_squared_error, mean_absolute_error
+import matplotlib.pyplot as plt
 
 warnings.filterwarnings("ignore")
 
-tickers = ['^DJI', 'FEZ', 'VNM']
-print("Đang tải dữ liệu Dow Jones (^DJI)...")
-data = yf.download(tickers, start='2022-01-01', end='2025-12-31')['Close']
-series = data['^DJI'].dropna()
+# Load local data
+data_path = os.path.join("data", "main_data", "tech_macro_aligned.csv")
+print(f"Đang tải dữ liệu Apple (AAPL) từ {data_path}...")
+df = pd.read_csv(data_path)
+df['Date'] = pd.to_datetime(df['Date'])
+df.set_index('Date', inplace=True)
+
+# Filter for AAPL
+aapl_df = df[df['Ticker'] == 'AAPL'].sort_index()
+series = aapl_df['Close'].dropna()
 
 log_returns = (np.log(series / series.shift(1)) * 100).dropna()
 
-train = log_returns.loc['2022-01-01':'2023-12-31']
+# Splitting data
+train = log_returns.loc[:'2023-12-31']
 val = log_returns.loc['2024-01-01':'2024-12-31']
-test = log_returns.loc['2025-01-01':'2025-12-31']
+# Test for 1 month starting from Feb 2025
+test = log_returns.loc['2025-02-01':'2025-03-01']
 
-test_prices = series.loc['2025-01-01':'2025-12-31']
-last_val_price = series.loc[:'2024-12-31'].iloc[-1]
+test_prices = series.loc['2025-02-01':'2025-03-01']
+# Use the price right before the test period as base
+last_val_price = series.loc[:'2025-01-31'].iloc[-1]
 
-history_returns = list(train.values) + list(val.values)
+history_returns = list(log_returns.loc[:'2025-01-31'].values)
 actual_test_returns = list(test.values)
 
 predicted_returns = []
@@ -31,6 +41,7 @@ predicted_volatility = []
 print(f"--- Đang huấn luyện mô hình ARIMA-GARCH ({len(actual_test_returns)} ngày) ---")
 
 for t in range(len(actual_test_returns)):
+    # ARIMA(5,0,0) as in original script
     model_arima = ARIMA(history_returns, order=(5, 0, 0))
     model_arima_fit = model_arima.fit()
     
@@ -60,11 +71,11 @@ for t in range(len(predicted_returns)):
     predictions.append(pred_price)
 
 print("\n================================================================================")
-print("BẢNG KIỂM NGHIỆM DỮ LIỆU THỰC TẾ (THÁNG 1/2025)")
+print("BẢNG KIỂM NGHIỆM DỮ LIỆU THỰC TẾ (THÁNG 2/2025)")
 print("================================================================================")
 print(f"{'Date':<15} {'Thực tế':<15} {'Dự báo':<15} {'Sai lệch':<15}")
 
-for i in range(min(10, len(test_prices))):
+for i in range(len(test_prices)):
     date_str = test_prices.index[i].strftime('%Y-%m-%d')
     act = actual_prices[i]
     pred = predictions[i]
@@ -84,7 +95,6 @@ print(f'2. MAE (Top 20%): {shock_mae:.2f}%')
 
 std_error = (np.std(errors) / avg_price) * 100
 print(f'3. Standard Deviation (Errors): {std_error:.2f}%')
-import matplotlib.pyplot as plt
 
 upper_bounds = []
 lower_bounds = []
@@ -112,18 +122,20 @@ for t in range(len(predictions)):
 
 plt.figure(figsize=(12, 6))
 
-plt.plot(test_prices.index, actual_prices, color='#2ca02c', marker='o', linewidth=2, label='Thực tế (Actual)')
+# Updated colors to match eval_rolling_forcast.py
+# Ground Truth: #060c8f, Forecast: #e74c3c
+plt.plot(test_prices.index, actual_prices, color='#060c8f', marker='o', linewidth=2, label='Ground Truth')
+plt.plot(test_prices.index, predictions, color='#e74c3c', linestyle='--', marker='s', label='Forecast (ARIMA/GARCH)')
 
-plt.plot(test_prices.index, predictions, color='blue', linestyle='--', label='Dự báo ARIMA')
-
-plt.fill_between(test_prices.index, lower_bounds, upper_bounds, color='red', alpha=0.08, label='Vùng an toàn GARCH (95%)')
+plt.fill_between(test_prices.index, lower_bounds, upper_bounds, color='gray', alpha=0.1, label='Safe area GARCH (95%)')
 
 if anomalies_x:
     plt.scatter(anomalies_x, anomalies_y, color='red', s=150, zorder=5, label='PHÁT HIỆN BẤT THƯỜNG (Shock)')
 
-plt.title('Kiểm nghiệm ARIMA-GARCH trên dữ liệu thực tế (Năm 2025)')
-plt.legend(loc='lower left')
+plt.title('Forecast Comparison: AAPL')
+plt.legend(loc='upper left')
 plt.grid(True, alpha=0.2, linestyle='--')
+plt.xticks(rotation=45)
 plt.tight_layout()
 
 plt.show()
