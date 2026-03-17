@@ -6,6 +6,7 @@ from statsmodels.tsa.arima.model import ARIMA
 from arch import arch_model
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 import matplotlib.pyplot as plt
+from itertools import product
 
 warnings.filterwarnings("ignore")
 
@@ -22,9 +23,8 @@ series = aapl_df['Close'].dropna()
 
 log_returns = (np.log(series / series.shift(1)) * 100).dropna()
 
-# Splitting data
-train = log_returns.loc[:'2023-12-31']
-val = log_returns.loc['2024-01-01':'2024-12-31']
+# Splitting data for training/validation
+train_val = log_returns.loc[:'2024-12-31']
 # Test for 1 month starting from Feb 2025
 test = log_returns.loc['2025-02-01':'2025-03-01']
 
@@ -32,17 +32,40 @@ test_prices = series.loc['2025-02-01':'2025-03-01']
 # Use the price right before the test period as base
 last_val_price = series.loc[:'2025-01-31'].iloc[-1]
 
+def find_best_arima_order(data):
+    p_range = range(0, 6)
+    d_range = range(0, 2)
+    q_range = range(0, 3)
+    
+    best_aic = float("inf")
+    best_order = (5, 0, 0) # Default fallback
+    
+    print("--- Tìm tham số ARIMA tối ưu (Grid Search) ---")
+    for p, d, q in product(p_range, d_range, q_range):
+        try:
+            model = ARIMA(data, order=(p, d, q))
+            results = model.fit()
+            if results.aic < best_aic:
+                best_aic = results.aic
+                best_order = (p, d, q)
+        except:
+            continue
+    print(f"Tham số ARIMA tốt nhất: {best_order} (AIC: {best_aic:.2f})")
+    return best_order
+
+# Find best parameters once on training data
+best_p, best_d, best_q = find_best_arima_order(train_val)
+
 history_returns = list(log_returns.loc[:'2025-01-31'].values)
 actual_test_returns = list(test.values)
 
 predicted_returns = []
 predicted_volatility = []
 
-print(f"--- Đang huấn luyện mô hình ARIMA-GARCH ({len(actual_test_returns)} ngày) ---")
+print(f"--- Đang huấn luyện mô hình ARIMA{best_p, best_d, best_q}-GARCH ({len(actual_test_returns)} ngày) ---")
 
 for t in range(len(actual_test_returns)):
-    # ARIMA(5,0,0) as in original script
-    model_arima = ARIMA(history_returns, order=(5, 0, 0))
+    model_arima = ARIMA(history_returns, order=(best_p, best_d, best_q))
     model_arima_fit = model_arima.fit()
     
     arima_forecast = model_arima_fit.forecast()[0]
@@ -71,7 +94,7 @@ for t in range(len(predicted_returns)):
     predictions.append(pred_price)
 
 print("\n================================================================================")
-print("BẢNG KIỂM NGHIỆM DỮ LIỆU THỰC TẾ (THÁNG 2/2025)")
+print(f"BẢNG KIỂM NGHIỆM DỮ LIỆU THỰC TẾ (THÁNG 2/2025) - ARIMA{best_p, best_d, best_q}")
 print("================================================================================")
 print(f"{'Date':<15} {'Thực tế':<15} {'Dự báo':<15} {'Sai lệch':<15}")
 
@@ -122,17 +145,15 @@ for t in range(len(predictions)):
 
 plt.figure(figsize=(12, 6))
 
-# Updated colors to match eval_rolling_forcast.py
-# Ground Truth: #060c8f, Forecast: #e74c3c
 plt.plot(test_prices.index, actual_prices, color='#060c8f', marker='o', linewidth=2, label='Ground Truth')
-plt.plot(test_prices.index, predictions, color='#e74c3c', linestyle='--', marker='s', label='Forecast (ARIMA/GARCH)')
+plt.plot(test_prices.index, predictions, color='#e74c3c', linestyle='--', marker='s', label=f'Forecast (ARIMA{best_p, best_d, best_q}/GARCH)')
 
 plt.fill_between(test_prices.index, lower_bounds, upper_bounds, color='gray', alpha=0.1, label='Safe area GARCH (95%)')
 
 if anomalies_x:
-    plt.scatter(anomalies_x, anomalies_y, color='red', s=150, zorder=5, label='PHÁT HIỆN BẤT THƯỜNG (Shock)')
+    plt.scatter(anomalies_x, anomalies_y, color='red', s=150, zorder=5, label='Shock detected')
 
-plt.title('Forecast Comparison: AAPL')
+plt.title(f'Forecast Comparison: AAPL (ARIMA/GARCH)')
 plt.legend(loc='upper left')
 plt.grid(True, alpha=0.2, linestyle='--')
 plt.xticks(rotation=45)
