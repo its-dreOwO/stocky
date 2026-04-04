@@ -32,7 +32,7 @@ def generate_weighted_heatmap():
     else:
         print("Warning: Sentiment data not found. Proceeding without it.")
 
-    tickers = df['Ticker'].unique()
+    tickers = [t for t in df['Ticker'].unique() if t != 'MSFT']
     all_importances = {}
     
     features_base = ['Open', 'High', 'Low', 'Volume', 'Fed_Rate', 'CPI', 'Treasury_10Y']
@@ -94,9 +94,9 @@ def generate_weighted_heatmap():
     plt.figure(figsize=(16, 10))
     sns.heatmap(heatmap_df, annot=True, cmap='YlGnBu', fmt=".3f", linewidths=.5)
     
-    plt.title('Parameter "Weights" (Feature Importance) Across Tickers', fontsize=18)
-    plt.ylabel('Parameters / Features', fontsize=14)
-    plt.xlabel('Tickers', fontsize=14)
+    plt.title('heatmap của các tham số', fontsize=18)
+    plt.ylabel('tham số', fontsize=14)
+    plt.xlabel('mã cổ phiếu', fontsize=14)
     
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)

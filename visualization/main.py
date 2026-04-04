@@ -109,30 +109,20 @@ train_size = int(len(X) * 0.8)
 X_train, y_train = X[:train_size], y[:train_size]
 X_test, y_test = X[train_size:], y[train_size:]
 
-# Định nghĩa mô hình N-Linear (Normalization Linear)
-class NLinear(nn.Module):
-    def __init__(self, seq_len, pred_len=1):
-        super(NLinear, self).__init__()
-        self.seq_len = seq_len
-        self.pred_len = pred_len
-        self.linear = nn.Linear(seq_len, pred_len)
+# Định nghĩa mạng Neural Network đơn giản
+class SimpleForecaster(nn.Module):
+    def __init__(self):
+        super(SimpleForecaster, self).__init__()
+        self.linear1 = nn.Linear(SEQ_LEN, 32) # Tăng số neuron cho dữ liệu thực
+        self.relu = nn.ReLU()
+        self.linear2 = nn.Linear(32, 1)
 
     def forward(self, x):
-        # x shape: [Batch, Seq, 1]
-        
-        # 1. Normalization: Trừ đi giá trị cuối cùng của chuỗi đầu vào
-        seq_last = x[:, -1:, :].detach()
-        x = x - seq_last
-        
-        # 2. Linear Layer
-        x = x.squeeze(-1) # Chuyển về [Batch, Seq]
-        out = self.linear(x) # [Batch, Pred]
-        
-        # 3. Denormalization: Cộng lại giá trị cuối cùng
-        out = out + seq_last.squeeze(-1)
-        return out
+        x = x.squeeze(-1)
+        x = self.relu(self.linear1(x))
+        return self.linear2(x)
 
-model = NLinear(SEQ_LEN)
+model = SimpleForecaster()
 criterion = nn.MSELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=0.005)
 
@@ -175,16 +165,13 @@ axs[0].set_xlabel('Epochs')
 axs[0].set_ylabel('Loss')
 axs[0].set_yscale('log') # Dùng log scale để thấy rõ sự hội tụ
 
-# 4.1 Biểu đồ Dự báo vs Thực tế (Focus vào 2 tháng gần nhất - 42 ngày giao dịch)
+# 4.1 Biểu đồ Dự đoán vs Thực tế
 test_dates = df.index[train_size + SEQ_LEN:]
-LOOKBACK_WINDOW = 42 # Khoảng 2 tháng giao dịch
-
-axs[1].plot(test_dates[-LOOKBACK_WINDOW:], actual_prices[-LOOKBACK_WINDOW:], color='#1f77b4', label='Thực tế (Ground Truth)', marker='o', markersize=4, alpha=0.8)
-axs[1].plot(test_dates[-LOOKBACK_WINDOW:], predicted_prices[-LOOKBACK_WINDOW:], color='#ff7f0e', linestyle='--', label='Dự báo (Predicted)', marker='x', markersize=4, linewidth=2)
-axs[1].set_title(f'Dự báo 2 tháng gần nhất (MSE: {mean_squared_error(actual_prices[-LOOKBACK_WINDOW:], predicted_prices[-LOOKBACK_WINDOW:]):.2f})', fontsize=13)
+axs[1].plot(test_dates, actual_prices, color='#1f77b4', label='Thực tế (Ground Truth)', alpha=0.8)
+axs[1].plot(test_dates, predicted_prices, color='#ff7f0e', linestyle='--', label='Dự báo (Predicted)', linewidth=2)
+axs[1].set_title(f'Kết quả trên tập Test (MSE: {mse_score:.2f})', fontsize=13)
 axs[1].legend()
 axs[1].tick_params(axis='x', rotation=30)
-axs[1].grid(True, linestyle=':', alpha=0.6)
 
 plt.tight_layout()
 plt.show()

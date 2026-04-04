@@ -31,8 +31,7 @@ PATIENCE = 30
 FEATURE_WEIGHTS = { 
     'ROC_5': 0.65, 
     'RSI_14': 0.65,
-    '{TICKER}_Sentiment_Tone': 0.65,
-    'SEC_Event': 1.0
+    '{TICKER}_Sentiment_Tone': 0.65
 }
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")

@@ -23,13 +23,14 @@ series = aapl_df['Close'].dropna()
 
 log_returns = (np.log(series / series.shift(1)) * 100).dropna()
 
-# Splitting data for training/validation
-train_val = log_returns.loc[:'2024-12-31']
-# Test for 1 month starting from Feb 2025
-test = log_returns.loc['2025-02-01':'2025-03-01']
 
+train_val = log_returns.loc[:'2024-12-31']
+test = log_returns.loc['2025-02-01':'2025-03-01']
 test_prices = series.loc['2025-02-01':'2025-03-01']
-# Use the price right before the test period as base
+
+
+
+
 last_val_price = series.loc[:'2025-01-31'].iloc[-1]
 
 def find_best_arima_order(data):
